@@ -232,7 +232,7 @@ prompts = {}
 ann_frame_idx = 0
 from tqdm import tqdm
 
-for idx, mask in tqdm(enumerate(masks)):
+for idx, mask in tqdm(enumerate(sorted(masks, key=(lambda x: x['area']), reverse=True))):
     
     # # ADD THE ANCHOR POINTS
     # points_mask = np.array(mask['point_coords'])
@@ -290,7 +290,7 @@ for out_frame_idx in range(0, len(frame_names), vis_frame_stride):
         # print(out_obj_id)
         # print(out_mask)
         show_mask(out_mask, plt.gca(), obj_id=out_obj_id)
-        if out_obj_id > 19: break 
+        # if out_obj_id > 19: break 
     plt.savefig(f'./results/seg_sam2_{out_frame_idx}.png')
     plt.show()
 # %%
