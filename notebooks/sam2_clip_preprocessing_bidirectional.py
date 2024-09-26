@@ -96,20 +96,76 @@ for clip_dir in clip_dirs:
 
         # Compare the masks of the current frame with the one computed in previous frame
         if ann_frame_idx - frame_step >= 0:
-            for id, mask in clip_segments[ann_frame_idx - frame_step][
+            matches = []
+            for src_idx, src_mask in clip_segments[ann_frame_idx - frame_step][
                 ann_frame_idx
             ].items():
-                src = torch.from_numpy(mask).squeeze()
+                src = torch.from_numpy(src_mask).squeeze()
                 j_index = JaccardIndex(task="multiclass", num_classes=2)
-                for idx, ann in enumerate(masks):
-                    trg = torch.from_numpy(ann["segmentation"])
+                for dest_idx, dest_mask in enumerate(masks):
+                    trg = torch.from_numpy(dest_mask["segmentation"])
                     j_idx_score = j_index(src, trg)
                     if j_idx_score > 0.8:
+                        matches.append((src_idx, dest_idx, j_idx_score))
                         print(
-                            f"{id} from {ann_frame_idx - frame_step} vs",
-                            f" {idx} from {ann_frame_idx}:  {j_idx_score}"
+                            f"{src_idx} from {ann_frame_idx - frame_step} vs",
+                            f" {dest_idx} from {ann_frame_idx}:  {j_idx_score}"
                         )
+                        # Display single objects detected
+                        img = np.ones((dest_mask['segmentation'].shape[0], dest_mask['segmentation'].shape[1], 4))
+                        img[:, :, 3] = 0
+                        plt.figure(figsize=(20, 20))
+                        plt.imshow(frame)
                         
+                        ax = plt.gca()
+                        ax.set_autoscale_on(False)
+                        
+                        m = dest_mask['segmentation']
+                        color_mask = np.concatenate([np.random.random(3), [0.5]])
+                        img[m] = color_mask 
+                        # if borders:
+                        #     import cv2
+                        #     contours, _ = cv2.findContours(m.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE) 
+                        #     # Try to smooth contours
+                        #     contours = [cv2.approxPolyDP(contour, epsilon=0.01, closed=True) for contour in contours]
+                        #     cv2.drawContours(img, contours, -1, (0, 0, 1, 0.4), thickness=1) 
+                        print(dest_mask['point_coords'])
+                        point_coords = np.array(dest_mask['point_coords'])
+                        print(point_coords.shape)
+                        ax.scatter(point_coords[:, 0], point_coords[:, 1], color='green', marker='*', s=200, edgecolor='white', linewidth=1.25)
+                        ax.imshow(img)
+                        plt.axis('off')
+                        plt.show()
+                        plt.close()
+                        
+                        ## Display single objects detected in the source segmentation
+                        img = np.ones((src.shape[0], src.shape[1], 4))
+                        img[:, :, 3] = 0
+                        plt.figure(figsize=(20, 20))
+                        plt.imshow(frame)
+                        
+                        ax = plt.gca()
+                        ax.set_autoscale_on(False)
+                        
+                        m = src
+                        color_mask = np.concatenate([np.random.random(3), [0.5]])
+                        img[m] = color_mask 
+                        # if borders:
+                        #     import cv2
+                        #     contours, _ = cv2.findContours(m.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE) 
+                        #     # Try to smooth contours
+                        #     contours = [cv2.approxPolyDP(contour, epsilon=0.01, closed=True) for contour in contours]
+                        #     cv2.drawContours(img, contours, -1, (0, 0, 1, 0.4), thickness=1) 
+                        # print(ann['point_coords'])
+                        # point_coords = np.array(ann['point_coords'])
+                        # print(point_coords.shape)
+                        # ax.scatter(point_coords[:, 0], point_coords[:, 1], color='green', marker='*', s=200, edgecolor='white', linewidth=1.25)
+                        ax.imshow(img)
+                        plt.axis('off')
+                        plt.show()
+                        plt.close()
+                        print("=" * 50)
+            print(f"there are {len(matches)} matches between frame {ann_frame_idx - frame_step} and frame {ann_frame_idx}") 
 
         predictor = build_sam2_video_predictor(
             model_cfg, sam2_checkpoint, device=device
@@ -117,12 +173,12 @@ for clip_dir in clip_dirs:
         inference_state = predictor.init_state(video_path=str(clip_dir))
 
         prompts = {}
-        for idx, mask in tqdm(
+        for dest_idx, src_mask in tqdm(
             enumerate(sorted(masks, key=(lambda x: x["area"]), reverse=True)),
             ncols=100,
         ):
-            ann_obj_id = idx
-            segmentation = torch.from_numpy(mask["segmentation"])
+            ann_obj_id = dest_idx
+            segmentation = torch.from_numpy(src_mask["segmentation"])
             prompts[ann_obj_id] = segmentation
             f_idx, out_obj_ids, out_mask_logits = predictor.add_new_mask(
                 inference_state=inference_state,
@@ -133,7 +189,7 @@ for clip_dir in clip_dirs:
         video_segments = {}
         start_frame = ann_frame_idx
         end_frame = ann_frame_idx + 1
-        print(f"{ann_frame_idx - frame_step} >= 0")
+
         if ann_frame_idx - frame_step >= 0:
             start_frame = ann_frame_idx - frame_step
             for (
@@ -146,11 +202,13 @@ for clip_dir in clip_dirs:
                 start_frame_idx=ann_frame_idx,
                 max_frame_num_to_track=frame_step,
             ):
+                # print(f"{ann_frame_idx - frame_step} >= 0")
+                print(f"Propagate backward: {out_frame_idx}")
                 video_segments[out_frame_idx] = {
                     out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
                     for i, out_obj_id in enumerate(out_obj_ids)
                 }
-        print(f"{ann_frame_idx + frame_step} <= {num_frames}")
+
         if ann_frame_idx + frame_step <= num_frames:
             end_frame = ann_frame_idx + frame_step + 1
             for (
@@ -163,6 +221,8 @@ for clip_dir in clip_dirs:
                 start_frame_idx=ann_frame_idx,
                 max_frame_num_to_track=frame_step,
             ):
+                # print(f"{ann_frame_idx + frame_step} <= {num_frames}")
+                print()
                 video_segments[out_frame_idx] = {
                     out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
                     for i, out_obj_id in enumerate(out_obj_ids)
