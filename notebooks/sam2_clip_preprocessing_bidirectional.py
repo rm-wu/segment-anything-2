@@ -4,6 +4,7 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
+from torchmetrics import JaccardIndex
 
 
 from PIL import Image
@@ -92,6 +93,24 @@ for clip_dir in clip_dirs:
         ]
         frame_names.sort(key=lambda p: int(str(p).split("/")[-1].split(".")[0]))
         print(frame_names)
+
+        # Compare the masks of the current frame with the one computed in previous frame
+        if ann_frame_idx - frame_step >= 0:
+            for id, mask in clip_segments[ann_frame_idx - frame_step][
+                ann_frame_idx
+            ].items():
+                src = torch.from_numpy(mask).squeeze()
+                j_index = JaccardIndex(task="multiclass", num_classes=2)
+                for idx, ann in enumerate(masks):
+                    trg = torch.from_numpy(ann["segmentation"])
+                    j_idx_score = j_index(src, trg)
+                    if j_idx_score > 0.8:
+                        print(
+                            f"{id} from {ann_frame_idx - frame_step} vs",
+                            f" {idx} from {ann_frame_idx}:  {j_idx_score}"
+                        )
+                        
+
         predictor = build_sam2_video_predictor(
             model_cfg, sam2_checkpoint, device=device
         )
@@ -117,14 +136,15 @@ for clip_dir in clip_dirs:
         print(f"{ann_frame_idx - frame_step} >= 0")
         if ann_frame_idx - frame_step >= 0:
             start_frame = ann_frame_idx - frame_step
-            for out_frame_idx, out_obj_ids, out_mask_logits in tqdm(
-                predictor.propagate_in_video(
-                    inference_state,
-                    reverse=True,
-                    start_frame_idx=ann_frame_idx,
-                    max_frame_num_to_track=frame_step,
-                ),
-                ncols=100,
+            for (
+                out_frame_idx,
+                out_obj_ids,
+                out_mask_logits,
+            ) in predictor.propagate_in_video(
+                inference_state,
+                reverse=True,
+                start_frame_idx=ann_frame_idx,
+                max_frame_num_to_track=frame_step,
             ):
                 video_segments[out_frame_idx] = {
                     out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
@@ -133,14 +153,15 @@ for clip_dir in clip_dirs:
         print(f"{ann_frame_idx + frame_step} <= {num_frames}")
         if ann_frame_idx + frame_step <= num_frames:
             end_frame = ann_frame_idx + frame_step + 1
-            for out_frame_idx, out_obj_ids, out_mask_logits in tqdm(
-                predictor.propagate_in_video(
-                    inference_state,
-                    reverse=False,
-                    start_frame_idx=ann_frame_idx,
-                    max_frame_num_to_track=frame_step,
-                ),
-                ncols=100,
+            for (
+                out_frame_idx,
+                out_obj_ids,
+                out_mask_logits,
+            ) in predictor.propagate_in_video(
+                inference_state,
+                reverse=False,
+                start_frame_idx=ann_frame_idx,
+                max_frame_num_to_track=frame_step,
             ):
                 video_segments[out_frame_idx] = {
                     out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
@@ -149,10 +170,9 @@ for clip_dir in clip_dirs:
         clip_segments[ann_frame_idx] = video_segments
         vis_frame_stride = 1
         plt.close("all")
-        seg_path = (clip_dir / "new_seg")
+        seg_path = clip_dir / "new_seg"
         seg_path.mkdir(exist_ok=True, parents=True)
-        for out_frame_idx in range(
-            start_frame, end_frame, vis_frame_stride):
+        for out_frame_idx in range(start_frame, end_frame, vis_frame_stride):
             print("Plotting frame: ", out_frame_idx)
             # plt.figure(figsize=(6, 4))
             # plt.title(f"frame {out_frame_idx}")
