@@ -289,7 +289,7 @@ for out_frame_idx in range(0, len(frame_names), vis_frame_stride):
     for out_obj_id, out_mask in video_segments[out_frame_idx].items():
         # print(out_obj_id)
         # print(out_mask)
-        show_mask(out_mask, plt.gca(), obj_id=out_obj_id)
+        show_mask(out_mask, plt.gca(), obj_id=out_obj_id, random_color=True)
         # if out_obj_id > 19: break 
     plt.savefig(f'./results/seg_sam2_{out_frame_idx}.png')
     plt.show()
