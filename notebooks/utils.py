@@ -38,7 +38,7 @@ def show_mask(mask, ax, obj_id=None, random_color=False):
     if random_color:
         color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
     else:
-        cmap = plt.get_cmap("tab10")
+        cmap = plt.get_cmap("tab20")
         cmap_idx = 0 if obj_id is None else obj_id
         color = np.array([*cmap(cmap_idx)[:3], 0.6])
     h, w = mask.shape[-2:]
