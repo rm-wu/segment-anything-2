@@ -66,7 +66,7 @@ def show_mask(mask, ax, obj_id=None, random_color=False):
     if random_color:
         color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
     else:
-        cmap = plt.get_cmap("tab20")
+        cmap = plt.get_cmap("tab10")
         cmap_idx = 0 if obj_id is None else obj_id
         color = np.array([*cmap(cmap_idx)[:3], 0.6])
     h, w = mask.shape[-2:]
@@ -86,8 +86,8 @@ plt.axis('off')
 plt.show()
 # %%
 
-sam2_checkpoint = Path("/home/mereur1/projects/ocl/clip_seg/segment-anything-2/checkpoints/sam2_hiera_small.pt")
-model_cfg = "sam2_hiera_s.yaml"
+sam2_checkpoint = Path("/home/mereur1/projects/ocl/clip_seg/segment-anything-2/checkpoints/sam2_hiera_tiny.pt")
+model_cfg = "sam2_hiera_t.yaml"
 sam2 = build_sam2(model_cfg, sam2_checkpoint, device=device, apply_postprocessing=False)
 
 mask_generator = SAM2AutomaticMaskGenerator(
@@ -289,7 +289,7 @@ for out_frame_idx in range(0, len(frame_names), vis_frame_stride):
     for out_obj_id, out_mask in video_segments[out_frame_idx].items():
         # print(out_obj_id)
         # print(out_mask)
-        show_mask(out_mask, plt.gca(), obj_id=out_obj_id, random_color=True)
+        show_mask(out_mask, plt.gca(), obj_id=out_obj_id)
         # if out_obj_id > 19: break 
     plt.savefig(f'./results/seg_sam2_{out_frame_idx}.png')
     plt.show()
