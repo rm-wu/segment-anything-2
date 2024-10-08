@@ -12,8 +12,9 @@ from sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
 from sam2.build_sam import build_sam2_video_predictor
 
 
-DATA_PATH = Path("./venice_short/").resolve()
-print(DATA_PATH.exists())
+DATA_PATH = Path("/home/mereur1/projects/ocl/segment-anything-2/notebooks/data/venice_short/").resolve()
+print(DATA_PATH)
+assert DATA_PATH.exists()  
 #%%
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -127,7 +128,7 @@ plt.imshow(first_frame)
 show_anns(masks)
 # show_points(coords=points, labels=labels, ax=plt.gca())
 plt.axis('off')
-plt.savefig(f'./results/seg_sam2_ref.png')
+plt.savefig(f'/home/mereur1/projects/ocl/segment-anything-2/notebooks/results/seg_sam2_ref.png')
 plt.show()
 
 #%%
